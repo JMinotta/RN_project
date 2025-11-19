@@ -235,15 +235,15 @@ export class RobleGroupService {
 
       // Filtrar estudiantes disponibles
       const availableStudents = courseStudents.filter((student) => {
-        const studentId = student["user_id"] || student["_id"];
+        const studentId = student["student_id"];
         return !assignedStudentIds.has(studentId);
       });
 
       console.log(`[RobleGroupService] Estudiantes disponibles: ${availableStudents.length}`);
 
       return availableStudents.map((student) => ({
-        student_id: student["user_id"] || student["_id"],
-        user_id: student["user_id"] || student["_id"],
+        student_id: student["student_id"],
+        user_id: student["student_id"],
       }));
     } catch (error) {
       console.error("[RobleGroupService] Error obteniendo estudiantes disponibles:", error);
