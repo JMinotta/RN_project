@@ -45,6 +45,8 @@ export function EvaluatePeersModal({
 }: Props) {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [showRatingDialog, setShowRatingDialog] = useState(false);
   const maxGrade = 5; // Máximo de calificación
 
   useEffect(() => {
@@ -125,49 +127,28 @@ export function EvaluatePeersModal({
   };
 
   const handleEvaluateStudent = (student: Student) => {
-    Alert.alert(
-      'Evaluar Compañero',
-      `${student.name}\n${student.email}`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: '1 ⭐',
-          onPress: () => saveGrade(student, 1),
-        },
-        {
-          text: '2 ⭐⭐',
-          onPress: () => saveGrade(student, 2),
-        },
-        {
-          text: '3 ⭐⭐⭐',
-          onPress: () => saveGrade(student, 3),
-        },
-        {
-          text: '4 ⭐⭐⭐⭐',
-          onPress: () => saveGrade(student, 4),
-        },
-        {
-          text: '5 ⭐⭐⭐⭐⭐',
-          onPress: () => saveGrade(student, 5),
-        },
-      ]
-    );
+    setSelectedStudent(student);
+    setShowRatingDialog(true);
   };
 
-  const saveGrade = async (student: Student, grade: number) => {
+  const saveGrade = async (grade: number) => {
+    if (!selectedStudent) return;
+    
     try {
       setLoading(true);
-      console.log(`💾 Guardando calificación: ${grade}/${maxGrade} para ${student.name}`);
+      console.log(`💾 Guardando calificación: ${grade}/${maxGrade} para ${selectedStudent.name}`);
 
       await robleGradeService.saveGrade(
         activity._id,
-        student._id,
+        selectedStudent._id,
         grade,
         maxGrade,
         currentUserId
       );
 
       Alert.alert('Éxito', 'Calificación enviada correctamente');
+      setShowRatingDialog(false);
+      setSelectedStudent(null);
       await loadStudents(); // Recargar para mostrar la nueva calificación
       onSuccess();
     } catch (error) {
@@ -274,6 +255,67 @@ export function EvaluatePeersModal({
           </Pressable>
         </View>
       </View>
+
+      {/* Rating Dialog Modal */}
+      <Modal
+        visible={showRatingDialog}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowRatingDialog(false);
+          setSelectedStudent(null);
+        }}
+      >
+        <Pressable 
+          style={styles.dialogOverlay}
+          onPress={() => {
+            setShowRatingDialog(false);
+            setSelectedStudent(null);
+          }}
+        >
+          <Pressable style={styles.dialogContainer} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.dialogTitle}>Evaluar Compañero</Text>
+            {selectedStudent && (
+              <>
+                <Text style={styles.dialogStudentName}>{selectedStudent.name}</Text>
+                <Text style={styles.dialogStudentEmail}>{selectedStudent.email}</Text>
+                
+                <Text style={styles.dialogSubtitle}>Selecciona una calificación:</Text>
+                
+                <View style={styles.ratingButtons}>
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <Pressable
+                      key={rating}
+                      style={({ pressed }) => [
+                        styles.ratingButton,
+                        pressed && styles.ratingButtonPressed,
+                      ]}
+                      onPress={() => saveGrade(rating)}
+                      disabled={loading}
+                    >
+                      <Text style={styles.ratingNumber}>{rating}</Text>
+                      <Text style={styles.ratingStars}>
+                        {'⭐'.repeat(rating)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Pressable
+                  style={styles.dialogCancelButton}
+                  onPress={() => {
+                    setShowRatingDialog(false);
+                    setSelectedStudent(null);
+                  }}
+                  disabled={loading}
+                >
+                  <Text style={styles.dialogCancelText}>Cancelar</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Modal>
   );
 }
@@ -419,6 +461,90 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   closeFooterButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  dialogContainer: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  dialogTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  dialogStudentName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  dialogStudentEmail: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  dialogSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  ratingButtons: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  ratingButton: {
+    backgroundColor: '#f1f5f9',
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  ratingButtonPressed: {
+    backgroundColor: '#e0f2fe',
+    borderColor: '#2563eb',
+  },
+  ratingNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    width: 40,
+  },
+  ratingStars: {
+    fontSize: 20,
+  },
+  dialogCancelButton: {
+    backgroundColor: '#64748b',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  dialogCancelText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',

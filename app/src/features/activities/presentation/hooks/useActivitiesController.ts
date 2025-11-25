@@ -1,6 +1,15 @@
-import { useState, useCallback, useEffect } from "react";
-import { robleActivityService } from "../../../core/services/robleActivityService";
-import { robleCategoryService } from "../../../core/services/robleCategoryService";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { Activity } from '../../domain/models/activity';
+import { ActivityRepository } from '../../domain/repositories/activityRepository';
+import { activityRepository } from '../../data/repositories/activityRepositoryImpl';
+import { GetActivitiesByCourse } from '../../domain/useCases/getActivitiesByCourse';
+import { CreateActivity } from '../../domain/useCases/createActivity';
+import { UpdateActivity } from '../../domain/useCases/updateActivity';
+import { DeleteActivity } from '../../domain/useCases/deleteActivity';
+import { categoryRepository } from '../../../categories/data/repositories/categoryRepositoryImpl';
+import { GetCategoriesByCourse } from '../../../categories/domain/useCases/getCategoriesByCourse';
+import { Category } from '../../../categories/domain/models/category';
+import { CategoryRepository } from '../../../categories/domain/repositories/categoryRepository';
 
 // Hook para manejar actividades y categorías de un curso
 export interface ActivityData {
@@ -11,9 +20,44 @@ export interface ActivityData {
   category_id?: string;
 }
 
-export function useActivitiesController(courseId: string) {
-  const [activities, setActivities] = useState<Record<string, any>[]>([]);
-  const [categories, setCategories] = useState<Record<string, any>[]>([]);
+export interface UseActivitiesControllerOptions {
+  activityRepository?: ActivityRepository;
+  categoryRepository?: CategoryRepository;
+}
+
+export function useActivitiesController(
+  courseId: string,
+  options: UseActivitiesControllerOptions = {}
+) {
+  const {
+    activityRepository: activityRepo = activityRepository,
+    categoryRepository: categoryRepo = categoryRepository,
+  } = options;
+
+  // Initialize use cases
+  const getActivitiesUseCase = useMemo(
+    () => new GetActivitiesByCourse(activityRepo),
+    [activityRepo]
+  );
+  const createActivityUseCase = useMemo(
+    () => new CreateActivity(activityRepo),
+    [activityRepo]
+  );
+  const updateActivityUseCase = useMemo(
+    () => new UpdateActivity(activityRepo),
+    [activityRepo]
+  );
+  const deleteActivityUseCase = useMemo(
+    () => new DeleteActivity(activityRepo),
+    [activityRepo]
+  );
+  const getCategoriesUseCase = useMemo(
+    () => new GetCategoriesByCourse(categoryRepo),
+    [categoryRepo]
+  );
+
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,23 +66,23 @@ export function useActivitiesController(courseId: string) {
     if (!courseId) return;
 
     try {
-      const data = await robleActivityService.getActivitiesByCourse(courseId);
+      const data = await getActivitiesUseCase.execute(courseId);
       setActivities(data);
     } catch (err) {
       console.warn("Error cargando actividades:", err);
     }
-  }, [courseId]);
+  }, [courseId, getActivitiesUseCase]);
 
   const loadCategories = useCallback(async () => {
     if (!courseId) return;
 
     try {
-      const data = await robleCategoryService.getCategoriesByCourse(courseId);
+      const data = await getCategoriesUseCase.execute(courseId);
       setCategories(data);
     } catch (err) {
       console.warn("Error cargando categorías:", err);
     }
-  }, [courseId]);
+  }, [courseId, getCategoriesUseCase]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -58,7 +102,19 @@ export function useActivitiesController(courseId: string) {
     async (data: ActivityData) => {
       setIsCreating(true);
       try {
-        await robleActivityService.createActivity(data);
+        const result = await createActivityUseCase.execute({
+          title: data.title,
+          description: data.description,
+          dueDate: data.due_date,
+          courseId: data.course_id,
+          categoryId: data.category_id,
+        });
+
+        if (result instanceof Error || 'message' in result) {
+          const errorMsg = 'message' in result ? result.message : result.message;
+          throw new Error(errorMsg);
+        }
+
         await loadActivities();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -67,7 +123,7 @@ export function useActivitiesController(courseId: string) {
         setIsCreating(false);
       }
     },
-    [loadActivities]
+    [createActivityUseCase, loadActivities]
   );
 
   const updateActivity = useCallback(
@@ -81,27 +137,44 @@ export function useActivitiesController(courseId: string) {
       }
     ) => {
       try {
-        await robleActivityService.updateActivity(activityId, data);
+        const result = await updateActivityUseCase.execute(activityId, {
+          title: data.title,
+          description: data.description,
+          dueDate: data.due_date,
+          categoryId: data.category_id,
+        });
+
+        if (result instanceof Error || 'message' in result) {
+          const errorMsg = 'message' in result ? result.message : result.message;
+          throw new Error(errorMsg);
+        }
+
         await loadActivities();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         throw new Error(message);
       }
     },
-    [loadActivities]
+    [updateActivityUseCase, loadActivities]
   );
 
   const deleteActivity = useCallback(
     async (activityId: string) => {
       try {
-        await robleActivityService.deleteActivity(activityId);
+        const result = await deleteActivityUseCase.execute(activityId);
+
+        if (result instanceof Error || 'message' in result) {
+          const errorMsg = 'message' in result ? result.message : result.message;
+          throw new Error(errorMsg);
+        }
+
         await loadActivities();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         throw new Error(message);
       }
     },
-    [loadActivities]
+    [deleteActivityUseCase, loadActivities]
   );
 
   useEffect(() => {

@@ -2,6 +2,8 @@ export * from "./domain/models/user";
 export * from "./domain/repositories/authRepository";
 export * from "./domain/useCases/loginUseCase";
 export * from "./domain/useCases/signUpUseCase";
+export * from "./domain/valueObjects/email";
+export * from "./domain/valueObjects/password";
 
 export {
   robleAuthService,

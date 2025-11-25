@@ -11,6 +11,90 @@ export interface Course {
   studentCount: number;
 }
 
+export class CourseEntity {
+  constructor(
+    public readonly title: string,
+    public readonly description: string,
+    public readonly professorId: string,
+    public readonly role: CourseRole,
+    public readonly createdAt: Date,
+    public readonly studentCount: number,
+    public readonly id?: string,
+    public readonly code?: string | null
+  ) {}
+
+  isProfessor(): boolean {
+    return this.role === "Profesor";
+  }
+
+  isStudent(): boolean {
+    return this.role === "Estudiante";
+  }
+
+  hasStudents(): boolean {
+    return this.studentCount > 0;
+  }
+
+  hasCode(): boolean {
+    return !!this.code && this.code.trim() !== '';
+  }
+
+  getAgeInDays(): number {
+    const now = new Date();
+    const diffTime = now.getTime() - this.createdAt.getTime();
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  isRecent(): boolean {
+    return this.getAgeInDays() <= 7;
+  }
+
+  canEdit(userId: string): boolean {
+    return this.isProfessor() && this.professorId === userId;
+  }
+
+  canDelete(userId: string): boolean {
+    // Solo el profesor puede eliminar y si no tiene estudiantes
+    return this.canEdit(userId) && !this.hasStudents();
+  }
+
+  static create(params: {
+    title: string;
+    description: string;
+    professorId: string;
+    role: CourseRole;
+    createdAt?: Date;
+    studentCount?: number;
+    id?: string;
+    code?: string | null;
+  }): CourseEntity {
+    return new CourseEntity(
+      params.title,
+      params.description,
+      params.professorId,
+      params.role,
+      params.createdAt || new Date(),
+      params.studentCount || 0,
+      params.id,
+      params.code
+    );
+  }
+
+  toPlainObject(): Course {
+    return {
+      id: this.id,
+      title: this.title,
+      description: this.description,
+      code: this.code,
+      professorId: this.professorId,
+      role: this.role,
+      createdAt: this.createdAt,
+      studentCount: this.studentCount,
+    };
+  }
+}
+
+
 export interface CourseMapperOptions {
   currentUserId?: string | null;
   enrollmentCount?: number;
